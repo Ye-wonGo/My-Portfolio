@@ -55,20 +55,33 @@ app.get('/api', (req, res) => {
   res.json({ message: 'Backend is running successfully!' });
 });
 
-app.post('/api/upload', imageUpload.array('images', 20), (req, res) => {
+app.post('/api/upload', (req, res, next) => {
+  imageUpload.array('images', 20)(req, res, (err) => {
+    if (err) {
+      console.error('Upload Error:', err);
+      return res.status(500).json({ message: '이미지 업로드 중 서버 오류가 발생했습니다.', error: err.message });
+    }
+    next();
+  });
+}, (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
-  // Cloudinary에 업로드된 후의 URL(file.path)을 바로 반환합니다.
   const urls = files.map((file) => file.path);
   res.status(201).json({ urls });
 });
 
-app.post('/api/upload-pdf', pdfUpload.single('pdf'), (req, res) => {
+app.post('/api/upload-pdf', (req, res, next) => {
+  pdfUpload.single('pdf')(req, res, (err) => {
+    if (err) {
+      console.error('PDF Upload Error:', err);
+      return res.status(500).json({ message: 'PDF 업로드 중 서버 오류가 발생했습니다.', error: err.message });
+    }
+    next();
+  });
+}, (req, res) => {
   if (!req.file) {
     res.status(400).json({ message: 'PDF file is required' });
     return;
   }
-
-  // Cloudinary URL 반환
   const url = req.file.path;
   res.status(201).json({ url });
 });
