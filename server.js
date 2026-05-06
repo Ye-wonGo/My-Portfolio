@@ -3,55 +3,52 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const uploadsDir = path.join(__dirname, 'uploads');
 
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Cloudinary 환경 설정
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dhqwbsnik',
+  api_key: process.env.CLOUDINARY_API_KEY || '698974542396666',
+  api_secret: process.env.CLOUDINARY_API_SECRET // 반드시 .env 파일이나 Render 환경변수에 추가해야 합니다.
+});
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsDir);
+// 기존의 디스크 스토리지 로직 대신 Cloudinary 스토리지 사용
+const imageStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'portfolio_images',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'avif', 'webp'],
   },
-  filename: (_req, file, cb) => {
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`);
+});
+
+const pdfStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'portfolio_pdfs',
+    format: 'pdf',
   },
 });
 
 const imageUpload = multer({
-  storage,
+  storage: imageStorage,
   limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'image/png' || file.mimetype === 'image/jpeg') {
-      cb(null, true);
-      return;
-    }
-    cb(new Error('Only PNG and JPG files are allowed'));
-  },
 });
 
 const pdfUpload = multer({
-  storage,
+  storage: pdfStorage,
   limits: { fileSize: 20 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-      return;
-    }
-    cb(new Error('Only PDF files are allowed'));
-  },
 });
 
 // 미들웨어
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(uploadsDir));
+// 로컬 파일 업로드 제공 코드는 Cloudinary 사용으로 인해 제거됨
 
 // 기본 API 라우트
 app.get('/api', (req, res) => {
@@ -60,9 +57,8 @@ app.get('/api', (req, res) => {
 
 app.post('/api/upload', imageUpload.array('images', 20), (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
-  // Render 환경변수(RENDER_EXTERNAL_URL) 우선 적용
-  const baseUrl = process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get('host')}`;
-  const urls = files.map((file) => `${baseUrl}/uploads/${file.filename}`);
+  // Cloudinary에 업로드된 후의 URL(file.path)을 바로 반환합니다.
+  const urls = files.map((file) => file.path);
   res.status(201).json({ urls });
 });
 
@@ -72,9 +68,8 @@ app.post('/api/upload-pdf', pdfUpload.single('pdf'), (req, res) => {
     return;
   }
 
-  // Render 환경변수(RENDER_EXTERNAL_URL) 우선 적용
-  const baseUrl = process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get('host')}`;
-  const url = `${baseUrl}/uploads/${req.file.filename}`;
+  // Cloudinary URL 반환
+  const url = req.file.path;
   res.status(201).json({ url });
 });
 
