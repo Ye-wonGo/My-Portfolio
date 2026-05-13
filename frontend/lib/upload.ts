@@ -1,7 +1,7 @@
 const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL
 const apiCandidates = configuredBase
   ? [configuredBase]
-  : ["", "http://localhost:5000", "http://localhost:5100"]
+  : ["https://my-portfolio-rjwi.onrender.com", "", "http://localhost:5000"]
 
 export async function uploadImageFiles(files: File[]): Promise<string[]> {
   if (!files.length) return []
